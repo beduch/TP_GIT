@@ -1,0 +1,166 @@
+
+using System;
+using System.Collections.Generic;
+using tp1;
+
+namespace tpfinal
+{
+	public class Estrategia
+	{
+		private int CalcularDistancia(string str1, string str2)
+		{
+			// using the method
+			String[] strlist1 = str1.ToLower().Split(' ');
+			String[] strlist2 = str2.ToLower().Split(' ');
+			int distance = 1000;
+			foreach (String s1 in strlist1)
+			{
+				foreach (String s2 in strlist2)
+				{
+					distance = Math.Min(distance, Utils.calculateLevenshteinDistance(s1, s2));
+				}
+			}
+			return distance;
+		}
+
+		public String Consulta1(ArbolGeneral<DatoDistancia> arbol)
+		{
+			string resutl = "";
+			if (arbol.esHoja()) //si fuera hoja retorno su texto, el cual seria agregado a resutl
+			{
+				return arbol.getDatoRaiz().texto + "\n"; //la forma "\n" indica un salto de linea
+			}
+			else
+			{
+				foreach (ArbolGeneral<DatoDistancia> listaHijos in arbol.getHijos())
+				{
+					resutl += Consulta1(listaHijos); //se le agrega a resutl los textos de los hijos
+				}
+			}
+			return resutl;
+		}
+
+		public string Consulta2(ArbolGeneral<DatoDistancia> arbol)
+		{
+			List<string> caminos = new List<string>(); //donde se almacenaran todos los caminos posibles
+			Explorador_Caminos(arbol, "", caminos); //llena la lista "caminos" con los caminos
+			string resultado = "";
+			foreach (string camino in caminos)
+			{ //cada "camino" es el conjunto de recorridos hasta una hoja 
+				resultado += camino + "\n"; //se agrega el camino al resultado y hace un salto de linea
+			}
+			return resultado;
+		}
+
+		private void Explorador_Caminos(ArbolGeneral<DatoDistancia> arbol, string caminoActual, List<string> caminos)
+		{
+			caminoActual += " --> " + arbol.getDatoRaiz().ToString();
+			if (arbol.esHoja()) //el camino que se estaba siguiendo termina
+			{
+				caminos.Add(caminoActual); //se agrega el string del camino actual a la lista
+				return; //termina y vuelve a la recursion anterior
+			}
+			foreach (ArbolGeneral<DatoDistancia> hijo in arbol.getHijos())//se encarga de guardar todos los posibles caminos
+			{ 
+				Explorador_Caminos(hijo, caminoActual, caminos); 
+			}
+		}
+		
+		public String Consulta3(ArbolGeneral<DatoDistancia> arbol) 
+		{
+			bool evitar_ultimo_null = true;
+			string result = "nivel 0: ";
+			result += "\n";
+			int nivel = 0;
+			Cola<ArbolGeneral<DatoDistancia>> lacola = new Cola<ArbolGeneral<DatoDistancia>>();
+			lacola.encolar(arbol);
+			lacola.encolar(null);
+			while (!lacola.esVacia())
+			{
+				ArbolGeneral<DatoDistancia> Aux = lacola.desencolar();
+				if (Aux != null)
+				{
+					result += Aux.getDatoRaiz().texto + " - "; //entre cada texto del nivel esta la separacion -
+					if (!arbol.esHoja()) //si el arbol en el que estamos NO ES HOJA
+					{ //para prevenir cualquier inconveniente al ser la lista null
+						foreach (ArbolGeneral<DatoDistancia> hijos in Aux.getHijos())
+						{
+							evitar_ultimo_null = true;
+							lacola.encolar(hijos);
+						}
+					}
+				}
+				if (Aux == null && evitar_ultimo_null == true) //creo que podria poner if ((Aux == null) && (evitar_ultimo_null))
+				{
+					nivel++;
+					result += "\n" + "nivel " + nivel + ":\n"; //se hace un salto de linea, se muestra y se muestra el siguiente
+					evitar_ultimo_null = false; //lo seteamos a false y si en la siguiente iteracion el primer Aux es null terminaria el recorrido
+					lacola.encolar(null); //encolamos al null de nuevo al final de la cola
+				}
+			}
+			return result;
+		}
+
+		public void AgregarDato(ArbolGeneral<DatoDistancia> arbol, DatoDistancia dato)
+		{
+			bool avisador = true;
+			DatoDistancia DatoArbol = arbol.getDatoRaiz();
+            string auxGene = DatoArbol.texto; //dato del arbol
+            string auxDato = dato.texto; //dato del dato que se pasa
+            int distancia_Arbol_Dato = CalcularDistancia(auxGene,auxDato);
+			if (distancia_Arbol_Dato != 0) // si la distancia fuera la misma significaria que son la misma palabra
+			{
+				if (!arbol.esHoja()) //si el arbol en el que estamos NO ES HOJA
+				{
+					foreach (ArbolGeneral<DatoDistancia> listaHijos in arbol.getHijos())
+					{
+						DatoDistancia DatoHijos = listaHijos.getDatoRaiz();
+						int DistanciaHijos = DatoHijos.distancia;
+						if (DistanciaHijos == distancia_Arbol_Dato)
+						{
+							avisador = false; //desactivamos esto para que no se agregue el dato cuando termine la recursion
+							AgregarDato(listaHijos,dato);//si encontramos a alguien con la misma distancia nos volvemos a meter
+							break; //y ya que nos metimos terminamos aca para que no siga revisando los otros hijos
+						}
+					}
+					if (avisador == true) //esto significa que en la lista de hijos no hay ninguno que tenga la misma distancia y por lo tanto agrego el hijo
+					{
+						DatoDistancia ElDatoHijoMas = new DatoDistancia(distancia_Arbol_Dato,auxDato,dato.descripcion);
+						ArbolGeneral<DatoDistancia> UnHijoMas = new ArbolGeneral<DatoDistancia>(ElDatoHijoMas); //le pasamos como un sustituto
+						arbol.agregarHijo(UnHijoMas);
+					}
+				}
+				else //si el arbol en el que estamos ES HOJA
+				{
+					DatoDistancia ElDatoUnico = new DatoDistancia(distancia_Arbol_Dato,auxDato,dato.descripcion);
+					ArbolGeneral<DatoDistancia> HijoUnico = new ArbolGeneral<DatoDistancia>(ElDatoUnico); //le pasamos como un sustituto
+					arbol.agregarHijo(HijoUnico);
+				}
+			}
+		}
+
+		public void Buscar(ArbolGeneral<DatoDistancia> arbol, string elementoABuscar, int umbral, List<DatoDistancia> collected)
+		{
+			DatoDistancia DatoArbol = arbol.getDatoRaiz();
+            string auxGene = DatoArbol.texto; 
+            int distancia_Arbol_Elemento = CalcularDistancia(auxGene,elementoABuscar);
+			if (distancia_Arbol_Elemento <= umbral)
+			{
+				collected.Add(DatoArbol);
+			}
+			if (!arbol.esHoja()) //si el arbol en el que estamos NO ES HOJA
+			{
+				foreach (ArbolGeneral<DatoDistancia> listaHijos in arbol.getHijos())
+				{
+					DatoDistancia DatoHijos = listaHijos.getDatoRaiz();
+					string auxHijo = DatoHijos.texto; 
+            		int distancia_Hijo_Elemento = CalcularDistancia(auxHijo,elementoABuscar);
+					if (distancia_Hijo_Elemento <= umbral)
+					{
+						Buscar(listaHijos, elementoABuscar, umbral, collected);
+					}
+				}
+			}
+        }
+    }
+}
